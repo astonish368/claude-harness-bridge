@@ -33,7 +33,7 @@ var (
 	billingHeaderCCHPattern = regexp.MustCompile(`\bcch=([0-9a-f]{5});`)
 	hex64Pattern            = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 	uuidPattern             = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	defaultPromptMarkerRe   = regexp.MustCompile(`(?i)hermes agent|hermes-agent|\.hermes|soul\.md|hermes`)
+	defaultPromptMarkerRe   = regexp.MustCompile(`(?i)hermes agent|hermes-agent|\.hermes|soul\.md|openclaw|open-claw|open claw|\.openclaw|hermes`)
 )
 
 type TextReplacement struct {

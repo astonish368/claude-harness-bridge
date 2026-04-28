@@ -8,15 +8,30 @@ There are two modes:
 
 ```text
 direct-anthropic:
-OpenClaw / Claude harness -> this proxy -> real Anthropic
+OpenClaw / Hermes / Claude harness -> this proxy -> real Anthropic
 
 openai-proxy:
-OpenClaw / Claude harness -> this proxy -> cliproxy / OpenAI-compatible proxy -> OpenAI, xAI, Anthropic, etc.
+OpenClaw / Hermes / Claude harness -> this proxy -> cliproxy / OpenAI-compatible proxy -> OpenAI, xAI, Anthropic, etc.
 ```
 
 The first mode is the simple "I want OpenClaw to use Claude" path. The second mode is for putting this in front of another OpenAI-compatible proxy.
 
-## OpenClaw With Claude
+## Requirements
+
+Supported runtime: Linux, macOS, or WSL.
+
+You need:
+
+- Git
+- Go 1.22 or newer
+- Claude Code installed, so you can run `claude setup-token`
+- OpenClaw, Hermes, or another Anthropic-compatible harness
+
+If Go is missing, install it from https://go.dev/dl/ or with your system package manager.
+
+If Claude Code is missing, follow Anthropic's setup docs: https://docs.anthropic.com/en/docs/claude-code/getting-started
+
+## Hermes/OpenClaw/... With Claude
 
 1. Build the proxy:
 
@@ -43,12 +58,14 @@ export ANTHROPIC_API_KEY_REAL="paste-the-claude-setup-token-here"
 ./miniproxy direct-anthropic
 ```
 
-4. Point OpenClaw or any Anthropic-compatible harness at this proxy:
+4. In the terminal where you start OpenClaw, Hermes, or your harness, point it at this proxy:
 
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
 export ANTHROPIC_API_KEY="dummy"
 ```
+
+In Hermes/OpenClaw settings, choose an OpenAI-compatible endpoint as the provider/backend, not the built-in Anthropic provider. Use this proxy URL as the endpoint and a dummy key; this proxy handles the real upstream token.
 
 5. Use a Claude model in the harness, for example:
 
@@ -56,38 +73,21 @@ export ANTHROPIC_API_KEY="dummy"
 claude-sonnet-4-6
 ```
 
-In direct Anthropic mode, do not set `UPSTREAM_MODEL`. The harness should request the Claude model, and this proxy forwards that model to Anthropic unless you explicitly set `ANTHROPIC_MODEL_REAL`.
+## Direct Anthropic Mode (this is probably what you want)
 
-## Modes
+Flow:
+
+```text
+OpenClaw / Hermes / Claude harness
+  -> http://127.0.0.1:8787/v1/messages
+  -> miniproxy sanitizer
+  -> https://api.anthropic.com/v1/messages
+```
 
 Run direct to Anthropic:
 
 ```bash
 ./miniproxy direct-anthropic
-```
-
-Run through an OpenAI-compatible proxy:
-
-```bash
-./miniproxy openai-proxy
-```
-
-Flag form also works:
-
-```bash
-./miniproxy --mode direct-anthropic
-./miniproxy --mode openai-proxy
-```
-
-## Direct Anthropic Mode
-
-Flow:
-
-```text
-OpenClaw / Claude harness
-  -> http://127.0.0.1:8787/v1/messages
-  -> miniproxy sanitizer
-  -> https://api.anthropic.com/v1/messages
 ```
 
 Environment used by this proxy:
@@ -103,18 +103,20 @@ Optional:
 export ANTHROPIC_MODEL_REAL="claude-sonnet-4-6"
 ```
 
+In direct Anthropic mode, do not set `UPSTREAM_MODEL`. The harness should request the Claude model, and this proxy forwards that model to Anthropic unless you explicitly set `ANTHROPIC_MODEL_REAL`.
+
 Only set `ANTHROPIC_MODEL_REAL` if you want the proxy to force every request to that model. Otherwise the model requested by the harness passes through.
 
 Token note: this proxy does not refresh or manage the token. It reads `ANTHROPIC_API_KEY_REAL` at startup. If the token stops working, rerun `claude setup-token`, update the env var, and restart the proxy.
 
-## OpenAI-Compatible Proxy Mode
+## OpenAI-Compatible Proxy Mode (if you use a second proxy to rotate keys/track usage/etc)
 
 Use this mode when the next hop is cliproxy or another proxy that exposes OpenAI-compatible `/v1/chat/completions`.
 
 Flow:
 
 ```text
-OpenClaw / Claude harness
+OpenClaw / Hermes / Claude harness
   -> http://127.0.0.1:8787/v1/messages
   -> miniproxy sanitizer + Anthropic-to-OpenAI conversion
   -> http://127.0.0.1:4000/v1/chat/completions
@@ -142,6 +144,8 @@ export ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
 export ANTHROPIC_API_KEY="dummy"
 ```
 
+If your client has a provider picker, choose OpenAI-compatible endpoint. Do not select the built-in Anthropic provider for the Hermes/OpenClaw harness path.
+
 The client-side `ANTHROPIC_API_KEY` can be a dummy value because the proxy uses `ANTHROPIC_API_KEY_REAL` or `UPSTREAM_API_KEY` for the real upstream call.
 
 ## Models Endpoint
@@ -168,6 +172,7 @@ In `direct-anthropic` mode, it tries `GET /v1/models` from the real Anthropic up
 - Normalizes tool JSON Schemas enough to avoid common upstream rejects: missing object roots, stale `$schema` / `$id`, invalid `required`, bad `format`, and draft-04 boolean exclusive min/max.
 - Preserves short persona/system prompts.
 - Replaces huge third-party harness system templates with a short neutral software-engineering reminder.
+- Obfuscates Hermes/OpenClaw identifying terms in outbound prompt text, including Hermes agent names, `soul.md`, and OpenClaw markers.
 - Preserves `thinking` and `redacted_thinking` blocks byte-for-byte when text replacements are configured.
 
 ## Environment Variables

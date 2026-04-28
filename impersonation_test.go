@@ -77,8 +77,8 @@ func TestSanitizeAnthropicMessagesOAuthToolAndSystem(t *testing.T) {
 
 func TestSanitizeAnthropicMessagesObfuscatesDefaultPromptMarkers(t *testing.T) {
 	body := []byte(`{
-		"system":"HERMES AGENT instructions from soul.md",
-		"messages":[{"role":"user","content":[{"type":"text","text":"read /home/user/.hermes state"}]}]
+		"system":"HERMES AGENT OpenClaw instructions from soul.md",
+		"messages":[{"role":"user","content":[{"type":"text","text":"read /home/user/.hermes and .openclaw state"}]}]
 	}`)
 
 	out, _, err := SanitizeAnthropicMessages(body, Options{OAuth: true})
@@ -87,7 +87,7 @@ func TestSanitizeAnthropicMessagesObfuscatesDefaultPromptMarkers(t *testing.T) {
 	}
 
 	text := string(out)
-	for _, marker := range []string{"HERMES AGENT", "soul.md", ".hermes"} {
+	for _, marker := range []string{"HERMES AGENT", "OpenClaw", "soul.md", ".hermes", ".openclaw"} {
 		if strings.Contains(text, marker) {
 			t.Fatalf("expected %q to be obfuscated in %s", marker, text)
 		}
@@ -100,9 +100,9 @@ func TestSanitizeAnthropicMessagesObfuscatesDefaultPromptMarkers(t *testing.T) {
 func TestObfuscateDefaultPromptMarkersPreservesThinkingBlocks(t *testing.T) {
 	root := map[string]any{
 		"content": []any{
-			map[string]any{"type": "thinking", "thinking": "hermes soul.md stays"},
-			map[string]any{"type": "redacted_thinking", "data": "hermes stays too"},
-			map[string]any{"type": "text", "text": "hermes changes"},
+			map[string]any{"type": "thinking", "thinking": "hermes openclaw soul.md stays"},
+			map[string]any{"type": "redacted_thinking", "data": "hermes openclaw stays too"},
+			map[string]any{"type": "text", "text": "hermes openclaw changes"},
 		},
 	}
 
@@ -112,13 +112,13 @@ func TestObfuscateDefaultPromptMarkersPreservesThinkingBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Contains(out, []byte(`"thinking":"hermes soul.md stays"`)) {
+	if !bytes.Contains(out, []byte(`"thinking":"hermes openclaw soul.md stays"`)) {
 		t.Fatalf("thinking block changed: %s", string(out))
 	}
-	if !bytes.Contains(out, []byte(`"data":"hermes stays too"`)) {
+	if !bytes.Contains(out, []byte(`"data":"hermes openclaw stays too"`)) {
 		t.Fatalf("redacted thinking block changed: %s", string(out))
 	}
-	if bytes.Contains(out, []byte(`"text":"hermes changes"`)) {
+	if bytes.Contains(out, []byte(`"text":"hermes openclaw changes"`)) {
 		t.Fatalf("text block was not obfuscated: %s", string(out))
 	}
 }
