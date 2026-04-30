@@ -396,6 +396,6 @@ EOF
   fi
 fi
 
-echo "live smoke passed"
+echo "PASSED: live smoke completed"
 echo "proxy: $proxy_url"
 echo "model: $model"

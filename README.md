@@ -184,6 +184,7 @@ Common:
 - `SIGN_CCH`: default `true`.
 - `ADD_FAKE_USER_ID`: default `true`.
 - `CORE_PROMPT`: optional sanitizer prompt override.
+- `CLAUDE_CODE_VERSION`: optional forced Claude Code CLI version for the billing header and User-Agent. By default the proxy reads `claude --version` at startup and falls back to its built-in default if unavailable.
 - `DEBUG_DUMP_DIR`: optional local directory for sanitized request and upstream response JSON dumps. Use only while debugging because dumps may contain prompts, tool inputs, and keys from upstream error bodies.
 
 Direct Anthropic mode:

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,6 +33,7 @@ type config struct {
 	signCCH          bool
 	addFakeUserID    bool
 	corePrompt       string
+	claudeVersion    string
 	debugDumpDir     string
 }
 
@@ -98,6 +102,7 @@ func loadConfig() config {
 		signCCH:          envBoolDefault("SIGN_CCH", true),
 		addFakeUserID:    envBoolDefault("ADD_FAKE_USER_ID", true),
 		corePrompt:       os.Getenv("CORE_PROMPT"),
+		claudeVersion:    loadClaudeCodeVersion(),
 		debugDumpDir:     firstNonEmpty(os.Getenv("DEBUG_DUMP_DIR"), os.Getenv("MINIPROXY_DEBUG_DUMP_DIR")),
 	}
 }
@@ -125,6 +130,7 @@ func (cfg config) handleMessages(w http.ResponseWriter, r *http.Request) {
 		AddFakeUserID: cfg.addFakeUserID,
 		SessionID:     sessionID,
 		CorePrompt:    cfg.corePrompt,
+		Version:       cfg.claudeVersion,
 	})
 	if err != nil {
 		http.Error(w, "invalid Anthropic request: "+err.Error(), http.StatusBadRequest)
@@ -210,6 +216,7 @@ func (cfg config) forwardAnthropic(w http.ResponseWriter, r *http.Request, sanit
 		APIKey:              cfg.anthropicAPIKey,
 		UpstreamIsAnthropic: strings.Contains(cfg.anthropicBaseURL, "api.anthropic.com"),
 		ExtraBetas:          state.ExtraBetas,
+		DeviceProfile:       claudeDeviceProfile(cfg.claudeVersion),
 		SessionID:           state.SessionID,
 	})
 	upstreamReq.Header.Set("Accept-Encoding", "gzip")
@@ -294,6 +301,7 @@ func (cfg config) handleModels(w http.ResponseWriter, r *http.Request) {
 			impersonation.ApplyAnthropicHeaders(req.Header, impersonation.HeaderOptions{
 				APIKey:              cfg.anthropicAPIKey,
 				UpstreamIsAnthropic: strings.Contains(cfg.anthropicBaseURL, "api.anthropic.com"),
+				DeviceProfile:       claudeDeviceProfile(cfg.claudeVersion),
 				SessionID:           impersonation.NewSessionID(),
 			})
 			if resp, errDo := http.DefaultClient.Do(req); errDo == nil {
@@ -891,6 +899,36 @@ func normalizeMode(mode string) string {
 	default:
 		return strings.ToLower(strings.TrimSpace(mode))
 	}
+}
+
+var semanticVersionPattern = regexp.MustCompile(`\b\d+\.\d+\.\d+\b`)
+
+func loadClaudeCodeVersion() string {
+	if version := strings.TrimSpace(os.Getenv("CLAUDE_CODE_VERSION")); version != "" {
+		return version
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "claude", "--version").CombinedOutput()
+	if err != nil {
+		return impersonation.DefaultClaudeVersion
+	}
+	if version := semanticVersionPattern.FindString(string(out)); version != "" {
+		return version
+	}
+	return impersonation.DefaultClaudeVersion
+}
+
+func claudeDeviceProfile(version string) impersonation.DeviceProfile {
+	profile := impersonation.DefaultDeviceProfile()
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return profile
+	}
+	profile.UserAgent = fmt.Sprintf("claude-cli/%s (external, cli)", version)
+	return profile
 }
 
 func envBoolDefault(name string, fallback bool) bool {

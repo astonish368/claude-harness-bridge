@@ -84,9 +84,15 @@ func TestMiniProxyDirectAnthropicDecodesGzipAndReversesTools(t *testing.T) {
 		if r.URL.Path != "/v1/messages" {
 			t.Fatalf("upstream path = %q", r.URL.Path)
 		}
+		if got := r.Header.Get("User-Agent"); got != "claude-cli/9.8.7 (external, cli)" {
+			t.Fatalf("User-Agent = %q", got)
+		}
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
+		}
+		if text := pathString(body, "system", 0, "text"); !strings.Contains(text, "cc_version=9.8.7.") {
+			t.Fatalf("billing header = %q, want configured Claude Code version", text)
 		}
 		if got := pathString(body, "tools", 0, "name"); got != "BrowserNavigate" {
 			t.Fatalf("sanitized tool name = %q", got)
@@ -120,6 +126,7 @@ func TestMiniProxyDirectAnthropicDecodesGzipAndReversesTools(t *testing.T) {
 		oauthShape:       true,
 		signCCH:          true,
 		addFakeUserID:    true,
+		claudeVersion:    "9.8.7",
 	}
 	body := `{
 		"model":"claude-sonnet-4-6",
